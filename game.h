@@ -8,6 +8,14 @@
 #ifndef GAME_H_
 #define GAME_H_
 
+#include "boardState.h"
+
+class game{
+  private:
+
+  public:
+};
+
 
 
 
