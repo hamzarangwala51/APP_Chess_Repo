@@ -31,7 +31,7 @@ typedef struct gameMove
   int fromI, fromJ; //start and end squares
   int toI, toJ;
   int piece, capture; //piece that moved and piece that was captured
-};
+}gameMove;
 
 class cBoardState
 {
@@ -64,24 +64,26 @@ class cBoardState
     void fAddKingMoves(int i, int j);
     void fAddMove(int i, int j, int i2, int j2, int list); //add move to the given list
     void fPrintMoves();
-    string fPrintPiece(int piece);
+    std::string fPrintPiece(int piece);
     void fPrintBoard();
     void fProcessMove(gameMove *m);
     void fMove(gameMove *m);             //perform the given move on the board
     void fIsInCheck();                   //update values if current player's king is in check
     void fRemoveChecks();				//remove moves that result in check
     void fUndoMove();
+    void fCleanup();
 
     bool fCanMove(int i, int j);
     bool fMoveIsValid(gameMove *m);
     bool fCheckMoves(gameMove *m);       //check if the given move is in the validList
-
 
     gameMove* fAiCalculateMove();
 
     //alpha beta pruning functions, used to find the "best" move the ai can make
     int fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
     int fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
+    int fGetState();
+    int fGetTurn();
 };
 
 #endif /* BOARDSTATE_H_ */

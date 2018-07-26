@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <unistd.h>
+#include <string.h>
 #include "cBoardState.h"
 
 #ifndef CGAME_H_
@@ -18,14 +19,17 @@ class cGame{
 
     cGame();
     cGame(const cGame &g2) = delete;
+    cGame& operator=(cGame const&){};
     static cGame* mGame;
 
   public:
-    cGame* fGetGame();
+    static cGame* fGetGame();
     void fRun(int mode);
     void fGameLoopPVP();
     void fGameLoopPVA();
     void fGameLoopAVA();
+    int fGetCmd(gameMove *m);
+    int fCheckCoords(std::string coords);
 };
 
 #endif /* CGAME_H_ */

@@ -371,14 +371,18 @@ void cBoardState::fAddKingMoves(int i, int j)
 void cBoardState::fAddMove(int i, int j, int i2, int j2, int list)
 {
   //                                             piece         capture
-  gameMove* newMove = new gameMove{i, j, i2, j2, mBoard[i][j], mBoard[i2][j2]};
+  gameMove newMove;
+  newMove.fromI = i;
+  newMove.fromJ = j;
+  newMove.toI = i2;
+  newMove.toJ = j2;
+  newMove.piece = mBoard[i][j];
+  newMove.capture = mBoard[i2][j2];
 
   if(list == MOVELIST)
     mMoveList.push_back(newMove);
   else
     mValidList.push_back(newMove);
-
-  delete[] newMove;
 }
 
 void cBoardState::fPrintMoves()
@@ -386,7 +390,7 @@ void cBoardState::fPrintMoves()
 
 }
 
-string cBoardState::fPrintPiece(int piece)
+std::string cBoardState::fPrintPiece(int piece)
 {
   switch(piece)
   {
@@ -431,10 +435,10 @@ void cBoardState::fProcessMove(gameMove *m)
 {
   if(fMoveIsValid(m))
   {
-    fMove(m);
-    //fIsInCheck();
-    //fComputeValidMoves();
-    //fRemoveChecks();
+    fMove(m); //move and update turn
+    fIsInCheck();
+    fComputeValidMoves();
+    fRemoveChecks();
     fPrintBoard();
   }
   else
@@ -453,28 +457,28 @@ void cBoardState::fMove(gameMove *m)
 
   //check for pawn promotion
   if(piece == W_PAWN && m->toI == 0)
-  mBoard[m->toI][m->toJ] = W_QUEEN;
+    mBoard[m->toI][m->toJ] = W_QUEEN;
 
   if(piece == B_PAWN && m->toI == 7)
-  mBoard[m->toI][m->toJ] = B_QUEEN;
+    mBoard[m->toI][m->toJ] = B_QUEEN;
 
   //if a pawn moved forward two spaces it is vulnerable to en passant capture
   if(abs(piece) == B_PAWN && abs(m->toI - m->fromI) == 2)
   {
-  mEnPassant[0] = m->toI;
-  mEnPassant[1] = m->toJ;
+    mEnPassant[0] = m->toI;
+    mEnPassant[1] = m->toJ;
   }
   else //en passant capture can only be performed the turn immediately after the pawn moves forward twice
   {
-  mEnPassant[0] = -1;
-  mEnPassant[1] = -1;
+    mEnPassant[0] = -1;
+    mEnPassant[1] = -1;
   }
 
   //check for en passant captures
   if(abs(piece) == B_PAWN && m->fromJ != m->toJ && capture == EMPTY) //pawn moved diagonally to an empty square -> en passant capture
   {
-  int enPCapture = mBoard[m->fromI][m->toJ];
-  mBoard[m->fromI][m->toJ] = EMPTY;
+    int enPCapture = mBoard[m->fromI][m->toJ];
+    mBoard[m->fromI][m->toJ] = EMPTY;
   }
 
   //check for castling and move rook
@@ -527,53 +531,46 @@ void cBoardState::fMove(gameMove *m)
     }
   }
 
-mTurn++; //next turn
-fIsInCheck();
-fComputeValidMoves();
-fRemoveChecks();
-//system("clear");
-
+mTurn++;
 }
 
 void cBoardState::fIsInCheck()
 {
   int i;
   gameMove m;
-  cBoardState *nextBoard = new cBoardState(*this);
+  cBoardState nextBoard = *this;
 
-  nextBoard->mTurn++;
+  nextBoard.mTurn++;
 
   //check the possible moves the opponent can make
-  nextBoard->fComputeValidMoves();
+  nextBoard.fComputeValidMoves();
 
-  int loop = nextBoard->mValidList.size();
+  int loop = nextBoard.mValidList.size();
   for(i = 0; i < loop; i++)
   {
     //if they can capture my king then i am in check
-    if(abs(nextBoard->mValidList[i]->capture) == B_KING)
+    if(abs(nextBoard.mValidList[i].capture) == B_KING)
     {
-      if(nextBoard->mTurn%2 == 0)
+      if(nextBoard.mTurn%2 == 0)
         mBCheck = true;
 
-      else if(nextBoard->mTurn%2 == 1)
-        mWCheck = 1;
+      else if(nextBoard.mTurn%2 == 1)
+        mWCheck = true;
 
-      std::cout << "King in check" << std::endl;
       break;
     }
     else
     {
-      if(nextBoard->mTurn%2 == 0)
+      if(nextBoard.mTurn%2 == 0)
         mBCheck = false;
 
-      else if(nextBoard->mTurn%2 == 1)
+      else if(nextBoard.mTurn%2 == 1)
         mWCheck = false;
     }
   }
 
-  nextBoard->mValidList.clear();
-  nextBoard->mMoveList.clear();
-  delete[] nextBoard;
+  nextBoard.mValidList.clear();
+  nextBoard.mMoveList.clear();
 }
 
 void cBoardState::fRemoveChecks()
@@ -581,32 +578,33 @@ void cBoardState::fRemoveChecks()
   int i, j;
   gameMove m;
 
-  cBoardState *nextBoard = new cBoardState(*this);
+  cBoardState nextBoard = *this;
 
-  int loop = mValidList.size();
-  for(i = 0; i < loop; i++) //loop through all valid moves
+  std::vector<gameMove>::iterator it;
+  for(it = mValidList.begin(); it != mValidList.end(); it++) //loop through all valid moves
   {
-    m.fromI = mValidList[i]->fromI;
-    m.fromJ = mValidList[i]->fromJ;
-    m.toI = mValidList[i]->toI;
-    m.toJ = mValidList[i]->toJ;
-    m.piece = mValidList[i]->piece;
-    m.capture = mValidList[i]->capture;
+    m.fromI = it->fromI;
+    m.fromJ = it->fromJ;
+    m.toI = it->toI;
+    m.toJ = it->toJ;
+    m.piece = it->piece;
+    m.capture = it->capture;
 
-    nextBoard->fMove(&m); //do the move on the board copy
+    nextBoard.fMove(&m); //do the move on the board copy
+    nextBoard.fComputeValidMoves();
 
-    int loop2 = nextBoard->mValidList.size();
-    for(j = 0; j < loop2; j++) //loop through all the valid moves in the simulated board
+    std::vector<gameMove>::iterator it2;
+    for(it2 = nextBoard.mValidList.begin(); it2 != nextBoard.mValidList.end(); it2++) //loop through all the valid moves in the simulated board
     {
-      if(abs(nextBoard->mValidList[j]->capture) == B_KING) //if the king can be captured, the current move results in a check
+      if(abs(it2->capture) == B_KING) //if the king can be captured, the current move results in a check
       {
-        mValidList.erase(mValidList.begin()+j); // so we remove it from the list of valid moves
-        i--;
+        mValidList.erase(it); // so we remove it from the list of valid moves
+        it--;
         break; //stop looking in this scenario
       }
     }
 
-    nextBoard->fUndoMove();
+    nextBoard.fUndoMove();
   }
 
   if(mValidList.size() == 0) //no legal moves
@@ -628,9 +626,8 @@ void cBoardState::fRemoveChecks()
       mBCheck = false;
   }
 
-  nextBoard->mValidList.clear();
-  nextBoard->mMoveList.clear();
-  delete[] nextBoard;
+  nextBoard.mValidList.clear();
+  nextBoard.mMoveList.clear();
 }
 
 void cBoardState::fUndoMove()
@@ -638,11 +635,11 @@ void cBoardState::fUndoMove()
   mTurn--;
 
   //check if move was an en passant capture, if so J values will not be the same and the capture will be empty
-  if(abs(mMoveList.back()->piece) == B_PAWN && mMoveList.back()->fromJ != mMoveList.back()->toJ && mMoveList.back()->capture == EMPTY)
+  if(abs(mMoveList.back().piece) == B_PAWN && mMoveList.back().fromJ != mMoveList.back().toJ && mMoveList.back().capture == EMPTY)
   {
-    mBoard[mMoveList.back()->fromI][mMoveList.back()->toJ] = -(mMoveList.back()->piece); //captured piece will always be the opposite colored pawn
-    mEnPassant[0] = mMoveList.back()->fromI;
-    mEnPassant[1] = mMoveList.back()->toJ;
+    mBoard[mMoveList.back().fromI][mMoveList.back().toJ] = -(mMoveList.back().piece); //captured piece will always be the opposite colored pawn
+    mEnPassant[0] = mMoveList.back().fromI;
+    mEnPassant[1] = mMoveList.back().toJ;
   }
   else
   {
@@ -651,27 +648,27 @@ void cBoardState::fUndoMove()
   }
 
   //check for castling and fix rook
-  if(mMoveList.back()->piece == B_KING)
+  if(mMoveList.back().piece == B_KING)
   {
-    if (mMoveList.back()->toJ - mMoveList.back()->fromJ == -2) //castled left
+    if (mMoveList.back().toJ - mMoveList.back().fromJ == -2) //castled left
     {
       mBoard[0][0] = B_ROOK;
       mBoard[0][3] = EMPTY;
     }
-    else if (mMoveList.back()->toJ - mMoveList.back()->fromJ == 2) //castled right
+    else if (mMoveList.back().toJ - mMoveList.back().fromJ == 2) //castled right
     {
       mBoard[0][7] = B_ROOK;
       mBoard[0][5] = EMPTY;
     }
   }
-  else if(mMoveList.back()->piece == W_KING)
+  else if(mMoveList.back().piece == W_KING)
   {
-    if (mMoveList.back()->toJ - mMoveList.back()->fromJ == -2) //castled left
+    if (mMoveList.back().toJ - mMoveList.back().fromJ == -2) //castled left
     {
       mBoard[7][0] = W_ROOK;
       mBoard[7][3] = EMPTY;
     }
-    else if (mMoveList.back()->toJ - mMoveList.back()->fromJ == 2) //castled right
+    else if (mMoveList.back().toJ - mMoveList.back().fromJ == 2) //castled right
     {
       mBoard[7][7] = W_ROOK;
       mBoard[7][5] = EMPTY;
@@ -686,11 +683,17 @@ void cBoardState::fUndoMove()
     mWLostCastle = -1;
 
   //undo move
-  mBoard[mMoveList.back()->fromI][mMoveList.back()->fromJ] = mMoveList.back()->piece;
-  mBoard[mMoveList.back()->toI][mMoveList.back()->toJ] = mMoveList.back()->capture;
+  mBoard[mMoveList.back().fromI][mMoveList.back().fromJ] = mMoveList.back().piece;
+  mBoard[mMoveList.back().toI][mMoveList.back().toJ] = mMoveList.back().capture;
 
 
   mMoveList.pop_back(); //remove move from movelist
+}
+
+void cBoardState::fCleanup()
+{
+  mMoveList.clear();
+  mValidList.clear();
 }
 
 bool cBoardState::fCanMove(int i, int j)
@@ -741,8 +744,8 @@ bool cBoardState::fCheckMoves(gameMove *m)
   int i, loop = mValidList.size();
   for(i = 0; i < loop; i++)
   {
-    if(m->fromJ == mValidList[i]->fromJ && m->fromI == mValidList[i]->move.fromI \
-       && m->toJ == mValidList[i]->toJ && m->toI == mValidList[i]->toI )
+    if(m->fromJ == mValidList[i].fromJ && m->fromI == mValidList[i].fromI \
+       && m->toJ == mValidList[i].toJ && m->toI == mValidList[i].toI )
      //  && m->piece == curr->move.piece && m->capture == curr->move.capture)
       {
        return true;
@@ -765,4 +768,9 @@ int cBoardState::fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, 
 {
 
 }
+
+int cBoardState::fGetState(){return mState;}
+
+int cBoardState::fGetTurn(){return mTurn;}
+
 
