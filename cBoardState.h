@@ -28,8 +28,8 @@ enum gameState {PLAYING = 0, DRAW, WHITEWON, BLACKWON};
 
 typedef struct gameMove
 {
-  int fromI, toI; //start and end squares
-  int fromJ, toJ;
+  int fromI, fromJ; //start and end squares
+  int toI, toJ;
   int piece, capture; //piece that moved and piece that was captured
 };
 
@@ -42,11 +42,11 @@ class cBoardState
     int mBScore;       //total board score, see computeValidMoves()
     int mBoard[8][8];
     int mEnPassant[2]; //coordinates of piece that can be captured en passant
+    int mWLostCastle; //what turn did white lose castling ability?
+    int mBLostCastle;
 
     bool mWCheck;      //is white in check?
     bool mBCheck;
-    bool mWLostCastle; //can white castle?
-    bool mBLostCastle;
 
     std::vector<gameMove> mMoveList;  //list of moves that have been played
     std::vector<gameMove> mValidList; //list of legal moves that can be played this turn
@@ -64,15 +64,16 @@ class cBoardState
     void fAddKingMoves(int i, int j);
     void fAddMove(int i, int j, int i2, int j2, int list); //add move to the given list
     void fPrintMoves();
-    void fPrintPiece(int piece);
+    string fPrintPiece(int piece);
     void fPrintBoard();
     void fProcessMove(gameMove *m);
     void fMove(gameMove *m);             //perform the given move on the board
     void fIsInCheck();                   //update values if current player's king is in check
     void fRemoveChecks();				//remove moves that result in check
+    void fUndoMove();
 
     bool fCanMove(int i, int j);
-    bool fIsMoveValid(gameMove *m);
+    bool fMoveIsValid(gameMove *m);
     bool fCheckMoves(gameMove *m);       //check if the given move is in the validList
 
 
