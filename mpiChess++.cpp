@@ -29,5 +29,6 @@ int main(int argc, char **argv)
   else
     std::cout << "usage: " << argv[0] << "<optional args>\n <optional args> = pva , ava.\n pva = Player vs AI. ava = AI vs AI\n" << std::endl;
 
-	return 0;
+  cGame::fEndGame();
+  return 0;
 }

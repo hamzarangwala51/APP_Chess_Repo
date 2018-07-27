@@ -1,3 +1,4 @@
+
 /*
  * cBoardState.cpp
  *
@@ -756,17 +757,195 @@ bool cBoardState::fCheckMoves(gameMove *m)
 
 gameMove* cBoardState::fAiCalculateMove()
 {
+  int i, score;
+  int bestScore, player;
+  std::vector<gameMove>::iterator it, bestMove;
 
+  gameMove *m = new gameMove;
+
+  cBoardState simuBoard = *this;
+
+  if(mValidList.size() == 0)
+  {
+    if(mTurn%2 == 0 && mWCheck) //white turn and in check
+    {
+      m->fromI = m->fromJ = m->toI = m->toJ = m->piece = m->capture = -1;//returning arbitrary moves to check outside this function for end game
+      mState = BLACKWON;
+      return m;
+    }
+    else if (mTurn%2 == 1 && mBCheck) //black turn and in check 
+    {
+      m->fromI = m->fromJ = m->toI = m->toJ = m->piece = m->capture = -2;
+      mState = WHITEWON;
+      return m;
+    }
+      //white turn and not in check or black turn and not in check
+    else if((mTurn%2 == 0 && !mWCheck) || (mTurn%2 == 1 && !mBCheck))
+    {
+      m->fromI = m->fromJ = m->toI = m->toJ = m->piece = m->capture = -3;
+      mState = DRAW;
+      return m;
+    }
+  }
+
+  if(mTurn%2 == 0)
+    player = W_PAWN;
+  else
+    player = B_PAWN;
+
+  bestScore = -9999; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
+
+  //simulate all the moves in the valid list to find the best one
+  for(it = mValidList.begin(); it != mValidList.end(); it++)
+  {
+   // std::cout << "list size = " << mMoveList.size() << std::endl;
+
+    m->fromI = it->fromI;
+    m->fromJ = it->fromJ;
+    m->toI = it->toI;
+    m->toJ = it->toJ;
+    m->piece = it->piece;
+    m->capture = it->capture;
+
+//  std::cout << "move before undo {" << m->fromI << ", " << m->fromJ << ", " << m->toI << ", " << m->toJ << ", " << m->piece << ", " << m->capture << "}" << std::endl;
+
+    score = simuBoard.fAlphaBetaMax(m, player, -9999, 9999, 4);
+
+    simuBoard.fUndoMove();
+    ///*simuBoard->*/fIsInCheck();
+    ///*simuBoard->*/fComputeValidMoves();
+    ///*simuBoard->*/fRemoveChecks();
+//  std::cout << "move after undo {" << it->fromI << ", " << it->fromJ << ", " << it->toI << ", " << it->toJ << ", " << it->piece << ", " << it->capture << "}" << std::endl;
+
+    if(score > bestScore) // find a better move
+    {
+      bestScore = score;
+      bestMove = it;
+    }
+  }
+
+  m->fromI = bestMove->fromI;
+  m->fromJ = bestMove->fromJ;
+  m->toI = bestMove->toI;
+  m->toJ = bestMove->toJ;
+  m->piece = bestMove->piece;
+  m->capture = bestMove->capture;
+
+  simuBoard.fCleanup();
+  //delete[] simuBoard;
+
+  std::cout << "returning {" << m->fromI << ", " << m->fromJ << ", " << m->toI << ", " << m->toJ << ", " << m->piece << ", " << m->capture << "}" << std::endl;
+  return m; //ai will play this move
 }
 
 int cBoardState::fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft)
 {
+  int i, score;
+  int bestVal = -9999; //the maximizing player tries to increase this
+  std::vector<gameMove>::iterator it;
+  gameMove *mv = new gameMove;
 
+  if(depthLeft == 0)
+  {
+    delete mv;
+    mv = 0;
+    return (maxPlayer * (mBScore - mWScore)); //black score = (black - white), white score = -(black - white)
+  }
+
+  fMove(m);
+  fIsInCheck();
+  fComputeValidMoves();
+  fRemoveChecks();
+
+
+  cBoardState simuBoard = *this;
+  int numMoves = mMoveList.size();
+  for(it = mValidList.begin(); it != mValidList.end(); it++)
+  {
+    mv->fromI = it->fromI;
+    mv->fromJ = it->fromJ;
+    mv->toI = it->toI;
+    mv->toJ = it->toJ;
+    mv->piece = it->piece;
+    mv->capture = it->capture;
+
+    score = simuBoard.fAlphaBetaMin(mv, maxPlayer, alpha, beta, depthLeft - 1);
+
+
+    if(depthLeft > 1)
+      simuBoard.fUndoMove();
+
+    if(score > bestVal) //is this score better than the current best?
+      bestVal = score;
+
+    if(bestVal > alpha) //is the current best score better than the alpha?
+      alpha = bestVal;
+
+    if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
+    {
+      delete mv;
+      mv = 0;
+      return alpha;
+    }
+  }
+
+  delete mv;
+  mv = 0;
+  return alpha;
 }
 
 int cBoardState::fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft)
 {
+  int i, score;
+  int bestVal = 9999; //the minimizing player tries to decrease this
+  std::vector<gameMove>::iterator it;
+  gameMove *mv = new gameMove;
 
+  if(depthLeft == 0)
+  {
+    delete mv;
+    mv = 0;
+    return (maxPlayer * (mBScore - mWScore)); //black score = (black - white), white score = -(black - white)
+  }
+
+  fMove(m);
+  fIsInCheck();
+  fComputeValidMoves();
+  fRemoveChecks();
+
+  cBoardState simuBoard = *this;
+  int numMoves = mMoveList.size();
+  for(it = mValidList.begin(); it != mValidList.end(); it++)
+  {
+    mv->fromI = it->fromI;
+    mv->fromJ = it->fromJ;
+    mv->toI = it->toI;
+    mv->toJ = it->toJ;
+    mv->piece = it->piece;
+    mv->capture = it->capture;
+
+    score = simuBoard.fAlphaBetaMax(mv, maxPlayer, alpha, beta, depthLeft - 1);
+
+    if(depthLeft > 1)
+      simuBoard.fUndoMove();
+
+    if(score < bestVal) //is this score better than the current best?
+      bestVal = score;
+
+    if(bestVal < beta) //is the current best score better than the alpha?
+      beta = bestVal;
+
+    if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
+    {
+      delete mv;
+      mv = 0;
+      return beta;
+    }
+  }
+
+  delete mv;
+  mv = 0;
+  return beta;
 }
 
 int cBoardState::fGetState(){return mState;}

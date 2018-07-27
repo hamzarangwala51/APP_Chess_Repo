@@ -21,6 +21,12 @@ cGame* cGame::fGetGame()
   return mGame ? mGame : (mGame = new cGame());
 }
 
+void cGame::fEndGame()
+{
+  delete mGame;
+  mGame = 0;
+}
+
 void cGame::fRun(int mode)
 {
   bs = new cBoardState();
@@ -41,8 +47,8 @@ void cGame::fRun(int mode)
   else
     fGameLoopAVA();
 
-//  bs->mValidList.clear();
-//  bs->mMoveList.clear();
+  bs->fCleanup();
+  delete bs;
 }
 
 void cGame::fGameLoopPVP()
@@ -79,6 +85,52 @@ void cGame::fGameLoopPVP()
 
 void cGame::fGameLoopPVA()
 {
+  gameMove *m;;
+
+  while(bs->fGetState() == PLAYING)
+  {
+    bs->fPrintBoard();
+
+    if(bs->fGetTurn()%2 == 0)
+    {
+      std::cout << "White: ";
+
+      m = new gameMove;
+      int check = fGetCmd(m);
+      if(check == 1)
+        bs->fProcessMove(m); //check if valid coordinates were entered
+
+      else if( check == -1) //quit
+      {
+         delete m;
+         bs->fCleanup();
+         exit(0);
+      }
+    }
+    else
+    {
+      //std::cout << "Black: ";
+      delete m;
+      m = bs->fAiCalculateMove();
+
+      if(m->piece  > -1)
+      bs->fProcessMove(m);
+      delete m;
+    }
+    system("clear");
+  }
+
+  bs->fPrintBoard();
+  switch(bs->fGetState())
+  {
+    case DRAW:  std::cout << "Draw!" << std::endl; break;
+
+    case WHITEWON: std::cout << "White Won!" << std::endl; break;
+
+    case BLACKWON: std::cout << "Black Won!" << std::endl; break;
+  }
+
+  delete m;
 
 }
 
@@ -102,8 +154,7 @@ int cGame::fGetCmd(gameMove *m)
 
   if(strcmp("quit", coords.c_str()) == 0)
   {
-    bs->fCleanup();
-    exit(0);
+    return -1;
   }
   
 //  else if(strcmp("undo", coords) == 0 && bs->turn < 0)

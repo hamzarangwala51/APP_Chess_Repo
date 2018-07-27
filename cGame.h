@@ -19,11 +19,13 @@ class cGame{
 
     cGame();
     cGame(const cGame &g2) = delete;
+//    ~cGame();
     cGame& operator=(cGame const&){};
     static cGame* mGame;
 
   public:
     static cGame* fGetGame();
+    static void fEndGame();
     void fRun(int mode);
     void fGameLoopPVP();
     void fGameLoopPVA();

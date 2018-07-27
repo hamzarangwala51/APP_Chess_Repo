@@ -51,11 +51,6 @@ class cBoardState
     std::vector<gameMove> mMoveList;  //list of moves that have been played
     std::vector<gameMove> mValidList; //list of legal moves that can be played this turn
 
-  public:
-    cBoardState();
-    cBoardState(const cBoardState &b2);
-
-    void fComputeValidMoves();
     void fAddPieceMoves(int i, int j);   //add moves for the piece at the given coordinates
     void fAddPawnMoves(int i, int j);
     void fAddKnightMoves(int i, int j);
@@ -65,23 +60,31 @@ class cBoardState
     void fAddMove(int i, int j, int i2, int j2, int list); //add move to the given list
     void fPrintMoves();
     std::string fPrintPiece(int piece);
-    void fPrintBoard();
-    void fProcessMove(gameMove *m);
     void fMove(gameMove *m);             //perform the given move on the board
     void fIsInCheck();                   //update values if current player's king is in check
     void fRemoveChecks();				//remove moves that result in check
-    void fUndoMove();
-    void fCleanup();
-
     bool fCanMove(int i, int j);
     bool fMoveIsValid(gameMove *m);
     bool fCheckMoves(gameMove *m);       //check if the given move is in the validList
 
-    gameMove* fAiCalculateMove();
 
     //alpha beta pruning functions, used to find the "best" move the ai can make
     int fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
     int fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
+
+  public:
+    cBoardState();
+    cBoardState(const cBoardState &b2);
+
+    void fComputeValidMoves();
+    void fPrintBoard();
+    void fProcessMove(gameMove *m);
+    void fUndoMove();
+    void fCleanup();
+
+
+    gameMove* fAiCalculateMove();
+
     int fGetState();
     int fGetTurn();
 };
