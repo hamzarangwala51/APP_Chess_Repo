@@ -69,7 +69,7 @@ class cBoardState
 
 
     //alpha beta pruning functions, used to find the "best" move the ai can make
-    int fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
+    int fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft);
     int fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
 
   public:

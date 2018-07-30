@@ -809,7 +809,7 @@ gameMove* cBoardState::fAiCalculateMove()
 
 //  std::cout << "move before undo {" << m->fromI << ", " << m->fromJ << ", " << m->toI << ", " << m->toJ << ", " << m->piece << ", " << m->capture << "}" << std::endl;
 
-    score = simuBoard.fAlphaBetaMax(m, player, -9999, 9999, 4);
+    score = simuBoard.fAlphaBeta(m, player, true, -9999, 9999, 6);
 
     simuBoard.fUndoMove();
     ///*simuBoard->*/fIsInCheck();
@@ -817,7 +817,7 @@ gameMove* cBoardState::fAiCalculateMove()
     ///*simuBoard->*/fRemoveChecks();
 //  std::cout << "move after undo {" << it->fromI << ", " << it->fromJ << ", " << it->toI << ", " << it->toJ << ", " << it->piece << ", " << it->capture << "}" << std::endl;
 
-    if(score > bestScore) // find a better move
+    if(score >= bestScore) // find a better move
     {
       bestScore = score;
       bestMove = it;
@@ -838,7 +838,7 @@ gameMove* cBoardState::fAiCalculateMove()
   return m; //ai will play this move
 }
 
-int cBoardState::fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft)
+int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft)
 {
   int i, score;
   int bestVal = -9999; //the maximizing player tries to increase this
@@ -849,7 +849,8 @@ int cBoardState::fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, 
   {
     delete mv;
     mv = 0;
-    return (maxPlayer * (mBScore - mWScore)); //black score = (black - white), white score = -(black - white)
+
+    return (maxPlayer * (mBScore - mWScore));
   }
 
   fMove(m);
@@ -860,92 +861,77 @@ int cBoardState::fAlphaBetaMax(gameMove* m, int maxPlayer, int alpha, int beta, 
 
   cBoardState simuBoard = *this;
   int numMoves = mMoveList.size();
-  for(it = mValidList.begin(); it != mValidList.end(); it++)
+
+  if(isMaxPlayer)
   {
-    mv->fromI = it->fromI;
-    mv->fromJ = it->fromJ;
-    mv->toI = it->toI;
-    mv->toJ = it->toJ;
-    mv->piece = it->piece;
-    mv->capture = it->capture;
-
-    score = simuBoard.fAlphaBetaMin(mv, maxPlayer, alpha, beta, depthLeft - 1);
-
-
-    if(depthLeft > 1)
-      simuBoard.fUndoMove();
-
-    if(score > bestVal) //is this score better than the current best?
-      bestVal = score;
-
-    if(bestVal > alpha) //is the current best score better than the alpha?
-      alpha = bestVal;
-
-    if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
+    for(it = mValidList.begin(); it != mValidList.end(); it++)
     {
-      delete mv;
-      mv = 0;
-      return alpha;
+      mv->fromI = it->fromI;
+      mv->fromJ = it->fromJ;
+      mv->toI = it->toI;
+      mv->toJ = it->toJ;
+      mv->piece = it->piece;
+      mv->capture = it->capture;
+
+      score = simuBoard.fAlphaBeta(mv, maxPlayer, false, alpha, beta, depthLeft - 1);
+
+
+      if(depthLeft > 1)
+        simuBoard.fUndoMove();
+
+      if(score > bestVal) //is this score better than the current best?
+        bestVal = score;
+
+      if(bestVal > alpha) //is the current best score better than the alpha?
+        alpha = bestVal;
+
+      if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
+      {
+        delete mv;
+        mv = 0;
+        return alpha;
+      }
     }
-  }
 
-  delete mv;
-  mv = 0;
-  return alpha;
-}
-
-int cBoardState::fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft)
-{
-  int i, score;
-  int bestVal = 9999; //the minimizing player tries to decrease this
-  std::vector<gameMove>::iterator it;
-  gameMove *mv = new gameMove;
-
-  if(depthLeft == 0)
-  {
     delete mv;
     mv = 0;
-    return (maxPlayer * (mBScore - mWScore)); //black score = (black - white), white score = -(black - white)
+    return alpha;
   }
 
-  fMove(m);
-  fIsInCheck();
-  fComputeValidMoves();
-  fRemoveChecks();
-
-  cBoardState simuBoard = *this;
-  int numMoves = mMoveList.size();
-  for(it = mValidList.begin(); it != mValidList.end(); it++)
+  else
   {
-    mv->fromI = it->fromI;
-    mv->fromJ = it->fromJ;
-    mv->toI = it->toI;
-    mv->toJ = it->toJ;
-    mv->piece = it->piece;
-    mv->capture = it->capture;
-
-    score = simuBoard.fAlphaBetaMax(mv, maxPlayer, alpha, beta, depthLeft - 1);
-
-    if(depthLeft > 1)
-      simuBoard.fUndoMove();
-
-    if(score < bestVal) //is this score better than the current best?
-      bestVal = score;
-
-    if(bestVal < beta) //is the current best score better than the alpha?
-      beta = bestVal;
-
-    if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
+    for(it = mValidList.begin(); it != mValidList.end(); it++)
     {
-      delete mv;
-      mv = 0;
-      return beta;
-    }
-  }
+      mv->fromI = it->fromI;
+      mv->fromJ = it->fromJ;
+      mv->toI = it->toI;
+      mv->toJ = it->toJ;
+      mv->piece = it->piece;
+      mv->capture = it->capture;
 
-  delete mv;
-  mv = 0;
-  return beta;
+      score = simuBoard.fAlphaBeta(mv, maxPlayer, true, alpha, beta, depthLeft - 1);
+
+      if(depthLeft > 1)
+        simuBoard.fUndoMove();
+
+      if(score < bestVal) //is this score better than the current best?
+        bestVal = score;
+
+      if(bestVal < beta) //is the current best score better than the alpha?
+        beta = bestVal;
+
+      if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
+      {
+        delete mv;
+        mv = 0;
+        return beta;
+      }
+    }
+
+    delete mv;
+    mv = 0;
+    return beta;
+  }
 }
 
 int cBoardState::fGetState(){return mState;}
