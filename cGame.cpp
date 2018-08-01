@@ -32,21 +32,37 @@ void cGame::fRun(int mode)
   bs = new cBoardState();
 
   sleep(2);
-  system("clear");
+  if(rank == 0)
+    system("clear");
 
-  if(mode == PVP)
+  if(mode == PVP && rank == 0)
   {
     bs->fComputeValidMoves();
     fGameLoopPVP();
   }
   else if(mode == PVA)
   {
-    bs->fComputeValidMoves();
-    fGameLoopPVA();
+    if(rank == 0)
+    {
+      bs->fComputeValidMoves();
+      fGameLoopPVA();
+    }
+
+    else
+      bs->fAiCalculateMove();
   }
   else
-    fGameLoopAVA();
+  {
+    if(rank == 0)
+    {
+      bs->fComputeValidMoves();
+      fGameLoopPVA();
+    }
 
+    else
+      bs->fAiCalculateMove();
+
+  }
   bs->fCleanup();
   delete bs;
 }
@@ -86,6 +102,7 @@ void cGame::fGameLoopPVP()
 void cGame::fGameLoopPVA()
 {
   gameMove *m;;
+  struct timespec t1, t2;
 
   while(bs->fGetState() == PLAYING)
   {
@@ -109,15 +126,26 @@ void cGame::fGameLoopPVA()
     }
     else
     {
-      //std::cout << "Black: ";
-      delete m;
-      m = bs->fAiCalculateMove();
 
-      if(m->piece  > -1)
+      delete m;
+
+      bs->fMPISendBoardState();
+
+      clock_gettime(CLOCK_MONOTONIC, &t1);
+      m = bs->fMPIGetBestMove();
+      clock_gettime(CLOCK_MONOTONIC, &t2);
+
       bs->fProcessMove(m);
       delete m;
     }
+
     system("clear");
+
+    if(bs->fGetTurn()%2 == 1)
+    {
+      double deltaT = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_nsec - t1.tv_nsec)/1000000000L;
+      std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetListCount(VALIDLIST) << " moves in " << deltaT << " seconds" << std::endl;
+    }
   }
 
   bs->fPrintBoard();
@@ -156,10 +184,7 @@ int cGame::fGetCmd(gameMove *m)
   {
     return -1;
   }
-  
-//  else if(strcmp("undo", coords) == 0 && bs->turn < 0)
-  //  undoMove(&bs, &(bs->moveListTail->move));
-  
+
   if(fCheckCoords(coords))
   {
     m->fromJ = coords[0] - 'a';
@@ -198,3 +223,7 @@ int cGame::fCheckCoords(std::string coords)
 
   return 1;
 }
+
+void cGame::fSetType(MPI_Datatype d){ mGame->fSetType(d); }
+
+void cGame::fStartAi(){ bs->fAiCalculateMove(); }

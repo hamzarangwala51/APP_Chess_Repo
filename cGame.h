@@ -8,6 +8,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
+#include <sys/time.h>
+#include <iomanip>
 #include "cBoardState.h"
 
 #ifndef CGAME_H_
@@ -32,6 +34,8 @@ class cGame{
     void fGameLoopAVA();
     int fGetCmd(gameMove *m);
     int fCheckCoords(std::string coords);
+    void fSetType(MPI_Datatype d);
+    void fStartAi();
 };
 
 #endif /* CGAME_H_ */

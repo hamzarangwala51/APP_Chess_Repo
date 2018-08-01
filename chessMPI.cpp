@@ -1,34 +1,72 @@
 
 #include <string.h>
+#include <cstddef>
 #include "cGame.h"
+
+int worldSize, rank;
+MPI_Datatype customType;
 
 int main(int argc, char **argv)
 {
+  /*int mBoard[64];
+  int mEnPassant[2];
+  int mTurn;
+  int mState;
+  int mWScore;
+  int mBScore;
+  int mWLostCastle;
+  int mBLostCastle;
+  int mWCheck;
+  int mBCheck;
+*/
+  MPI_Init(&argc, &argv);
+  MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  if(argc == 1)
-  {
-    std::cout << "Entering Player vs Player mode" << std::endl;
+  int blockLength = 74;
+  MPI_Aint displacement = 0;
+  MPI_Datatype type = MPI_INT;
+
+  MPI_Type_create_struct(1, &blockLength, &displacement, &type, &customType);
+  MPI_Type_commit(&customType);
+
+//  cGame::fGetGame()->fSetType(customType);
+
+  //if(rank == 0)
+ // {
+    if(argc == 1)
+    {
+      if(rank == 0)
+        std::cout << "Entering Player vs Player mode" << std::endl;
       cGame::fGetGame()->fRun(PVP);
-  }
-  else if(argc == 2)
-  {
-    if(strcmp(argv[1], "pva") == 0)
-    {
-       std::cout << "Entering Player vs AI mode" << std::endl;
-       cGame::fGetGame()->fRun(PVA);
-
     }
-    else if(strcmp(argv[1], "ava") == 0)
+    else if(argc == 2)
     {
-      std::cout << "Entering AI vs AI mode\n" << std::endl;
-      cGame::fGetGame()->fRun(AVA);
+      if(strcmp(argv[1], "pva") == 0)
+      {
+         if(rank == 0)
+           std::cout << "Entering Player vs AI mode" << std::endl;
+         cGame::fGetGame()->fRun(PVA);
+
+      }
+      else if(strcmp(argv[1], "ava") == 0)
+      {
+        if(rank == 0)
+          std::cout << "Entering AI vs AI mode\n" << std::endl;
+        cGame::fGetGame()->fRun(AVA);
+      }
+      else
+        if(rank == 0)
+          std::cout << "usage: " << argv[0] << "<optional args>\n <optional args> = pva , ava.\n pva = Player vs AI. ava = AI vs AI\n" << std::endl;
     }
     else
-      std::cout << "usage: " << argv[0] << "<optional args>\n <optional args> = pva , ava.\n pva = Player vs AI. ava = AI vs AI\n" << std::endl;
-  }
-  else
-    std::cout << "usage: " << argv[0] << "<optional args>\n <optional args> = pva , ava.\n pva = Player vs AI. ava = AI vs AI\n" << std::endl;
+      if(rank == 0)
+        std::cout << "usage: " << argv[0] << "<optional args>\n <optional args> = pva , ava.\n pva = Player vs AI. ava = AI vs AI\n" << std::endl;
+ // }
 
   cGame::fEndGame();
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Finalize();
   return 0;
 }

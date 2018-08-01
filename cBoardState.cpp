@@ -1,4 +1,3 @@
-
 /*
  * cBoardState.cpp
  *
@@ -48,6 +47,26 @@ cBoardState::cBoardState(const cBoardState &b2)
   mWCheck = b2.mWCheck;
   mBLostCastle = b2.mBLostCastle;
   mWLostCastle = b2.mWLostCastle;
+}
+
+cBoardState::cBoardState(mpiBoardState *m)
+{
+  int i, j;
+
+  for(i = 0; i < 8; i++)
+    for(j = 0; j < 8; j++)
+      mBoard[i][j] = m->mBoard[((i << 3) + j)];
+
+  mTurn = m->mTurn;
+  mState = m->mState;
+  mWScore = m->mWScore;
+  mBScore = m->mBScore;
+  mEnPassant[0] = m->mEnPassant[0];
+  mEnPassant[1] = m->mEnPassant[1];
+  mBCheck = m->mBCheck == 1? true : false;
+  mWCheck = m->mWCheck == 1? true : false;;
+  mBLostCastle = m->mBLostCastle;
+  mWLostCastle = m->mWLostCastle;
 }
 
 void cBoardState::fComputeValidMoves()
@@ -440,10 +459,12 @@ void cBoardState::fProcessMove(gameMove *m)
     fIsInCheck();
     fComputeValidMoves();
     fRemoveChecks();
-    fPrintBoard();
   }
   else
+  {
     std::cout << "Invalid Move!" << std::endl;
+    sleep(2);
+  }
 }
 
 void cBoardState::fMove(gameMove *m)
@@ -755,87 +776,123 @@ bool cBoardState::fCheckMoves(gameMove *m)
   return false;
 }
 
-gameMove* cBoardState::fAiCalculateMove()
+void cBoardState::fAiCalculateMove()
 {
-  int i, score;
-  int bestScore, player;
+  int i, score, index;
+  int bestScore[2], globalBest[2], player;
+  int testNum, remainder, offset, prevOffset;
   std::vector<gameMove>::iterator it, bestMove;
 
-  gameMove *m = new gameMove;
+  bestScore[1] = rank; //MPI_MAXLOC will return the highest value and the rank that sent it
 
-  cBoardState simuBoard = *this;
-
-  if(mValidList.size() == 0)
+  do
   {
-    if(mTurn%2 == 0 && mWCheck) //white turn and in check
+    fMPIGetBoardState();
+  //  printf("Rank %d: after getboadrstate\n", rank);
+
+    int numMoves = mValidList.size();
+
+    bestScore[0] = -9999; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
+
+    //only allows enough processes as needed, ie if theres 60 moves and 300 procs then only 60 will compute
+    //rank 0 will never get here
+    if(numMoves >= rank)
     {
-      m->fromI = m->fromJ = m->toI = m->toJ = m->piece = m->capture = -1;//returning arbitrary moves to check outside this function for end game
-      mState = BLACKWON;
-      return m;
+      cBoardState simuBoard = *this;
+      //gameMove *m = new gameMove;
+
+      if(mTurn%2 == 0)
+        player = W_PAWN;
+      else
+        player = B_PAWN;
+
+      //number of moves not able to split evenly
+      remainder = numMoves % (worldSize - 1);
+
+      //how many moves each process should test
+      testNum = numMoves / (worldSize - (worldSize - numMoves) - 1);
+
+      //extra tests if any
+      offset = 0;
+
+      //number of extra tests process with rank = rank - 1 did.
+      prevOffset = 0;
+
+      if(remainder > 0)
+      {
+        if(remainder >= rank)
+        {
+          offset = 1;
+          prevOffset = rank == 1? 0 : 1; //rank 1 has no prevOffset
+        }
+      }
+
+      //simulate all the moves in the valid list to find the best one
+      //for(it = mValidList.begin(); it != mValidList.end(); it++)
+
+      //check my math if you want :)
+      int start = (((rank - 1) * testNum) + prevOffset);
+      int stop  = ((rank * testNum) + offset);
+    //  printf("Rank %d: total = %d, start = %d, stop = %d\n", rank, numMoves, start, stop);
+      for(i = start; i < stop; i++)
+      {
+     //   printf("Rank %d: currently testing move index %d\n", rank, i);
+        it = mValidList.begin() + i;
+        /*m->fromI = it->fromI;
+        m->fromJ = it->fromJ;
+        m->toI = it->toI;
+        m->toJ = it->toJ;
+        m->piece = it->piece;
+        m->capture = it->capture;
+*/
+        score = simuBoard.fAlphaBeta(&(*it), player, true, -9999, 9999, 6);
+
+        simuBoard.fUndoMove();
+
+        if(score >= bestScore[0]) // find a better move
+        {
+          bestScore[0] = score;
+          bestMove = it;
+          index = i;
+        }
+      }
+
+    //  printf("Rank %d: wait before allreduce\n", rank);
+      //synchronize before mpi reduce
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      //distribute the global maximum score
+      MPI_Allreduce(&bestScore, &globalBest, 1, MPI_2INT, MPI_MAXLOC, MPI_COMM_WORLD);
+
+      //wait for everyone to get the data
+      MPI_Barrier(MPI_COMM_WORLD);
+
+
+      //if this process had the highest score send the index of the move
+      if(globalBest[1] == rank)
+      {
+        MPI_Send(&index, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+      }
+
+      simuBoard.fCleanup();
     }
-    else if (mTurn%2 == 1 && mBCheck) //black turn and in check 
+
+    else
     {
-      m->fromI = m->fromJ = m->toI = m->toJ = m->piece = m->capture = -2;
-      mState = WHITEWON;
-      return m;
+      //two barriers to keep process that are not computing in sync with those that are
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      MPI_Allreduce(&bestScore, &globalBest, 1, MPI_2INT, MPI_MAXLOC, MPI_COMM_WORLD);
+
+      MPI_Barrier(MPI_COMM_WORLD);
     }
-      //white turn and not in check or black turn and not in check
-    else if((mTurn%2 == 0 && !mWCheck) || (mTurn%2 == 1 && !mBCheck))
-    {
-      m->fromI = m->fromJ = m->toI = m->toJ = m->piece = m->capture = -3;
-      mState = DRAW;
-      return m;
-    }
-  }
 
-  if(mTurn%2 == 0)
-    player = W_PAWN;
-  else
-    player = B_PAWN;
+  //  printf("Rank %d: next itr wait\n", rank);
+    //wait for all processes to reach this point before going on to next iteration
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  bestScore = -9999; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
+  }while(mState == PLAYING);
 
-  //simulate all the moves in the valid list to find the best one
-  for(it = mValidList.begin(); it != mValidList.end(); it++)
-  {
-   // std::cout << "list size = " << mMoveList.size() << std::endl;
-
-    m->fromI = it->fromI;
-    m->fromJ = it->fromJ;
-    m->toI = it->toI;
-    m->toJ = it->toJ;
-    m->piece = it->piece;
-    m->capture = it->capture;
-
-//  std::cout << "move before undo {" << m->fromI << ", " << m->fromJ << ", " << m->toI << ", " << m->toJ << ", " << m->piece << ", " << m->capture << "}" << std::endl;
-
-    score = simuBoard.fAlphaBeta(m, player, true, -9999, 9999, 6);
-
-    simuBoard.fUndoMove();
-    ///*simuBoard->*/fIsInCheck();
-    ///*simuBoard->*/fComputeValidMoves();
-    ///*simuBoard->*/fRemoveChecks();
-//  std::cout << "move after undo {" << it->fromI << ", " << it->fromJ << ", " << it->toI << ", " << it->toJ << ", " << it->piece << ", " << it->capture << "}" << std::endl;
-
-    if(score >= bestScore) // find a better move
-    {
-      bestScore = score;
-      bestMove = it;
-    }
-  }
-
-  m->fromI = bestMove->fromI;
-  m->fromJ = bestMove->fromJ;
-  m->toI = bestMove->toI;
-  m->toJ = bestMove->toJ;
-  m->piece = bestMove->piece;
-  m->capture = bestMove->capture;
-
-  simuBoard.fCleanup();
-  //delete[] simuBoard;
-
-  std::cout << "returning {" << m->fromI << ", " << m->fromJ << ", " << m->toI << ", " << m->toJ << ", " << m->piece << ", " << m->capture << "}" << std::endl;
-  return m; //ai will play this move
 }
 
 int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft)
@@ -934,8 +991,127 @@ int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int al
   }
 }
 
+mpiBoardState* cBoardState::fToStruct()
+{
+  int i, j;
+  mpiBoardState* m = new mpiBoardState;
+
+  //copy current boardstate to a structure that can be handled by MPI
+  for(i = 0; i < 8; i++)
+    for(j = 0; j < 8; j++)   //i,j coordinates are mapped 0-63 using the formula (8*i)+j
+       m->mBoard[((i << 3) + j)] = mBoard[i][j];
+
+  m->mEnPassant[0] = mEnPassant[0];
+  m->mEnPassant[1] = mEnPassant[1];
+  m->mTurn = mTurn;
+  m->mState = mState;
+  m->mWScore = mWScore;
+  m->mBScore = mBScore;
+  m->mWLostCastle = mWLostCastle;
+  m->mBLostCastle = mBLostCastle;
+  m->mWCheck = mWCheck? 1 : 0;
+  m->mBCheck = mBCheck? 1 : 0;
+
+  return m;
+}
+
+void cBoardState::fMPISendBoardState()
+{
+  mpiBoardState* m = fToStruct();
+
+  //synchronize processes so that they are ready to recv the boardstate
+  MPI_Barrier(MPI_COMM_WORLD);
+
+//  printf("Rank %d: sending boadrstate\n", rank);
+  //send boardstate
+  MPI_Bcast(m, 1, customType, 0, MPI_COMM_WORLD);
+
+  //wait until all processes get the boardstate
+  MPI_Barrier(MPI_COMM_WORLD);
+
+//  printf("Rank %d: sent boadrstate to %d processes\n", rank, worldSize);
+
+  delete m;
+}
+
+void cBoardState::fMPIGetBoardState()
+{
+  int i, j;
+  mpiBoardState* m = new mpiBoardState;
+
+//  printf("Rank %d: about to recv boadrstate\n", rank);
+
+  //synchronize processes so that they are ready to recv the boardstate
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  //get boardstate
+  MPI_Bcast(m, 1, customType, 0, MPI_COMM_WORLD);
+
+  //wait until all processes get the boardstate
+  MPI_Barrier(MPI_COMM_WORLD);
+
+//  printf("Rank %d: received boadrstate\n", rank);
+
+  cBoardState* bs = new cBoardState(m);
+
+  *this = *bs;
+
+  fIsInCheck();
+  fComputeValidMoves();
+  fRemoveChecks();
+
+  delete m;
+  delete bs;
+}
+
+gameMove* cBoardState::fMPIGetBestMove()
+{
+  int bestScore[2] = {-99999, 0}; //make sure this is never the max score
+  int index, globalBest[2];
+  std::vector<gameMove>::iterator it;
+
+  gameMove *m = new gameMove;;
+
+//  printf("Rank %d: wait before allreduce\n", rank);
+  //synchronize before mpi reduce
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  //distribute the global maximum score
+  MPI_Allreduce(&bestScore, &globalBest, 1, MPI_2INT, MPI_MAXLOC, MPI_COMM_WORLD);
+
+  //wait for everyone to get the data
+  MPI_Barrier(MPI_COMM_WORLD);
+//  printf("Rank %d: Recieved allreduce\n", rank);
+//  printf("Rank %d: waiting for index\n", rank);
+  //get the index of of the best move from the corresponding process
+  MPI_Recv(&index, 1, MPI_INT, globalBest[1], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+  //synchronize again before next iteration
+  MPI_Barrier(MPI_COMM_WORLD);
+//  printf("Rank %d: received index\n", rank);
+
+  it = mValidList.begin() + index;
+
+  m->fromI = it->fromI;
+  m->fromJ = it->fromJ;
+  m->toI = it->toI;
+  m->toJ = it->toJ;
+  m->piece = it->piece;
+  m->capture = it->capture;
+
+  return m;
+}
+
 int cBoardState::fGetState(){return mState;}
 
 int cBoardState::fGetTurn(){return mTurn;}
 
+void cBoardState::fSetType(MPI_Datatype d){mCustomType = d;}
 
+int cBoardState::fGetListCount(int list)
+{
+  if(list == VALIDLIST)
+    return mValidList.size();
+  else
+    return mMoveList.size();
+}

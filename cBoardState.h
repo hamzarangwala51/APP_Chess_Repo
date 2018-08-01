@@ -10,9 +10,14 @@
 #include <vector>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
+#include "mpi.h"
 
 #ifndef BOARDSTATE_H_
 #define BOARDSTATE_H_
+
+extern int rank, worldSize;
+extern MPI_Datatype customType;
 
 //Player v Player, Player v AI, AI v AI
 enum gameMode {PVP = 0, PVA, AVA};
@@ -25,6 +30,21 @@ enum piece {W_KING = -6, W_QUEEN, W_ROOK, W_BISHOP, W_KNIGHT, W_PAWN,
 enum list {MOVELIST = 0, VALIDLIST};
 
 enum gameState {PLAYING = 0, DRAW, WHITEWON, BLACKWON};
+
+//same as cBoardState but to tranfer over MPI
+typedef struct mpiBoardState
+{
+  int mBoard[64];
+  int mEnPassant[2];
+  int mTurn;
+  int mState;
+  int mWScore;
+  int mBScore;
+  int mWLostCastle;
+  int mBLostCastle;
+  int mWCheck;
+  int mBCheck;
+} mpiBoardState;
 
 typedef struct gameMove
 {
@@ -44,6 +64,7 @@ class cBoardState
     int mEnPassant[2]; //coordinates of piece that can be captured en passant
     int mWLostCastle; //what turn did white lose castling ability?
     int mBLostCastle;
+    MPI_Datatype mCustomType;
 
     bool mWCheck;      //is white in check?
     bool mBCheck;
@@ -67,14 +88,16 @@ class cBoardState
     bool fMoveIsValid(gameMove *m);
     bool fCheckMoves(gameMove *m);       //check if the given move is in the validList
 
+    mpiBoardState* fToStruct();
+    void fMPIGetBoardState();
 
     //alpha beta pruning functions, used to find the "best" move the ai can make
     int fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft);
-    int fAlphaBetaMin(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft);
 
   public:
     cBoardState();
     cBoardState(const cBoardState &b2);
+    cBoardState(mpiBoardState *m);
 
     void fComputeValidMoves();
     void fPrintBoard();
@@ -82,11 +105,14 @@ class cBoardState
     void fUndoMove();
     void fCleanup();
 
-
-    gameMove* fAiCalculateMove();
+    void fMPISendBoardState();
+    gameMove* fMPIGetBestMove();
+    void fAiCalculateMove();
 
     int fGetState();
     int fGetTurn();
+    void fSetType(MPI_Datatype d);
+    int fGetListCount(int list);
 };
 
 #endif /* BOARDSTATE_H_ */
