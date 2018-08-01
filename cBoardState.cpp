@@ -788,9 +788,9 @@ void cBoardState::fAiCalculateMove()
   do
   {
     fMPIGetBoardState();
-  //  printf("Rank %d: after getboadrstate\n", rank);
 
     int numMoves = mValidList.size();
+//    printf("Rank %d: after getboadrstate, moves = %d\n", rank, numMoves);
 
     bestScore[0] = -9999; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
 
@@ -806,11 +806,20 @@ void cBoardState::fAiCalculateMove()
       else
         player = B_PAWN;
 
-      //number of moves not able to split evenly
-      remainder = numMoves % (worldSize - 1);
 
-      //how many moves each process should test
-      testNum = numMoves / (worldSize - (worldSize - numMoves) - 1);
+      if(numMoves > worldSize)
+      {
+        //number of moves not able to split evenly
+        remainder = numMoves % (worldSize - 1);
+
+        //how many moves each process should test
+        testNum = numMoves / (worldSize - 1);
+      }
+      else
+      {
+        remainder = 0;
+        testNum = 1;
+      }
 
       //extra tests if any
       offset = 0;
@@ -833,10 +842,11 @@ void cBoardState::fAiCalculateMove()
       //check my math if you want :)
       int start = (((rank - 1) * testNum) + prevOffset);
       int stop  = ((rank * testNum) + offset);
-    //  printf("Rank %d: total = %d, start = %d, stop = %d\n", rank, numMoves, start, stop);
+
+    //  std::cout << "Rank " << rank << ": total = " << numMoves << " , start = " << start << " , stop = " << stop << std::endl;
       for(i = start; i < stop; i++)
       {
-     //   printf("Rank %d: currently testing move index %d\n", rank, i);
+  //      printf("Rank %d: currently testing move index %d\n", rank, i);
         it = mValidList.begin() + i;
         /*m->fromI = it->fromI;
         m->fromJ = it->fromJ;
@@ -857,7 +867,7 @@ void cBoardState::fAiCalculateMove()
         }
       }
 
-    //  printf("Rank %d: wait before allreduce\n", rank);
+//      printf("Rank %d: wait before allreduce\n", rank);
       //synchronize before mpi reduce
       MPI_Barrier(MPI_COMM_WORLD);
 
@@ -1070,7 +1080,7 @@ gameMove* cBoardState::fMPIGetBestMove()
   int index, globalBest[2];
   std::vector<gameMove>::iterator it;
 
-  gameMove *m = new gameMove;;
+  gameMove *m = new gameMove;
 
 //  printf("Rank %d: wait before allreduce\n", rank);
   //synchronize before mpi reduce

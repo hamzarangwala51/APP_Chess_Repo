@@ -51,12 +51,12 @@ void cGame::fRun(int mode)
     else
       bs->fAiCalculateMove();
   }
-  else
+  else if(mode == AVA)
   {
     if(rank == 0)
     {
       bs->fComputeValidMoves();
-      fGameLoopPVA();
+      fGameLoopAVA();
     }
 
     else
@@ -141,7 +141,7 @@ void cGame::fGameLoopPVA()
 
     system("clear");
 
-    if(bs->fGetTurn()%2 == 1)
+    if(bs->fGetTurn()%2 == 0)
     {
       double deltaT = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_nsec - t1.tv_nsec)/1000000000L;
       std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetListCount(VALIDLIST) << " moves in " << deltaT << " seconds" << std::endl;
@@ -164,6 +164,45 @@ void cGame::fGameLoopPVA()
 
 void cGame::fGameLoopAVA()
 {
+  gameMove *m ;
+  struct timespec t1, t2;
+
+  while(bs->fGetState() == PLAYING)
+  {
+    bs->fPrintBoard();
+
+    bs->fMPISendBoardState();
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    m = bs->fMPIGetBestMove();
+    clock_gettime(CLOCK_MONOTONIC, &t2);
+
+    bs->fProcessMove(m);
+    delete m;
+
+    system("clear");
+
+    double deltaT = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_nsec - t1.tv_nsec)/1000000000L;
+
+    if(bs->fGetTurn()%2 == 1)
+      std::cout << "White ";
+    else
+      std::cout << "Black ";
+
+    std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetListCount(VALIDLIST) << " moves in " << deltaT << " seconds" << std::endl;
+  }
+
+  bs->fPrintBoard();
+  switch(bs->fGetState())
+  {
+    case DRAW:  std::cout << "Draw!" << std::endl; break;
+
+    case WHITEWON: std::cout << "White Won!" << std::endl; break;
+
+    case BLACKWON: std::cout << "Black Won!" << std::endl; break;
+  }
+
+  delete m;
 
 }
 
