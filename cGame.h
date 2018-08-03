@@ -21,7 +21,6 @@ class cGame{
 
     cGame();
     cGame(const cGame &g2) = delete;
-//    ~cGame();
     cGame& operator=(cGame const&){};
     static cGame* mGame;
 
@@ -34,8 +33,6 @@ class cGame{
     void fGameLoopAVA();
     int fGetCmd(gameMove *m);
     int fCheckCoords(std::string coords);
-    void fSetType(MPI_Datatype d);
-    void fStartAi();
 };
 
 #endif /* CGAME_H_ */

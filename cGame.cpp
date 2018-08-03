@@ -11,10 +11,7 @@
 //make sure only one cGame class can be created
 cGame* cGame::mGame = NULL;
 
-cGame::cGame()
-{
-
-}
+cGame::cGame(){}
 
 cGame* cGame::fGetGame()
 {
@@ -35,6 +32,7 @@ void cGame::fRun(int mode)
   if(rank == 0)
     system("clear");
 
+  //entering different game loops
   if(mode == PVP && rank == 0)
   {
     bs->fComputeValidMoves();
@@ -64,7 +62,7 @@ void cGame::fRun(int mode)
 
   }
   bs->fCleanup();
-  delete bs;
+  delete bs; // heh
 }
 
 void cGame::fGameLoopPVP()
@@ -83,7 +81,6 @@ void cGame::fGameLoopPVP()
     if(fGetCmd(&m))
     {
      bs->fProcessMove(&m); //check if valid coordinates were entered
-     //std::cout << "wCheck: = , bcheck: = %d\n", bs->wCheck, bs->bCheck);
     }
     system("clear");
   }
@@ -101,7 +98,7 @@ void cGame::fGameLoopPVP()
 
 void cGame::fGameLoopPVA()
 {
-  gameMove *m;;
+  gameMove *m;
   struct timespec t1, t2;
 
   while(bs->fGetState() == PLAYING)
@@ -126,7 +123,6 @@ void cGame::fGameLoopPVA()
     }
     else
     {
-
       delete m;
 
       bs->fMPISendBoardState();
@@ -159,12 +155,11 @@ void cGame::fGameLoopPVA()
   }
 
   delete m;
-
 }
 
 void cGame::fGameLoopAVA()
 {
-  gameMove *m ;
+  gameMove *m;
   struct timespec t1, t2;
 
   while(bs->fGetState() == PLAYING)
@@ -203,15 +198,14 @@ void cGame::fGameLoopAVA()
   }
 
   delete m;
-
 }
 
 int cGame::fGetCmd(gameMove *m)
 {
   int i;
   std::string coords;
-  std::cin >> coords;
 
+  std::cin >> coords;
 
   if(coords.length() != 4)
     return 0;
@@ -224,6 +218,7 @@ int cGame::fGetCmd(gameMove *m)
     return -1;
   }
 
+  //convert to number coordinates
   if(fCheckCoords(coords))
   {
     m->fromJ = coords[0] - 'a';
@@ -262,7 +257,3 @@ int cGame::fCheckCoords(std::string coords)
 
   return 1;
 }
-
-void cGame::fSetType(MPI_Datatype d){ mGame->fSetType(d); }
-
-void cGame::fStartAi(){ bs->fAiCalculateMove(); }

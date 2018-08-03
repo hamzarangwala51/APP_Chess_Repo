@@ -7,6 +7,7 @@
 
 #include "cBoardState.h"
 
+//constructor
 cBoardState::cBoardState()
 {
   int board[8][8] = {{B_ROOK, B_KNIGHT, B_BISHOP, B_QUEEN, B_KING, B_BISHOP, B_KNIGHT, B_ROOK},
@@ -34,6 +35,7 @@ cBoardState::cBoardState()
 
 }
 
+//copy constructor
 cBoardState::cBoardState(const cBoardState &b2)
 {
   memcpy(mBoard, b2.mBoard, sizeof(b2.mBoard));
@@ -49,6 +51,7 @@ cBoardState::cBoardState(const cBoardState &b2)
   mWLostCastle = b2.mWLostCastle;
 }
 
+//construct from struct
 cBoardState::cBoardState(mpiBoardState *m)
 {
   int i, j;
@@ -113,6 +116,7 @@ void cBoardState::fComputeValidMoves()
       else //white piece
          mWScore += val;
 
+      //add piece moves for the corresponding player
       if((mTurn%2 == 0 && mBoard[i][j] < EMPTY) || (mTurn%2 == 1 && mBoard[i][j] > EMPTY))
         fAddPieceMoves(i, j);
     }
@@ -390,7 +394,6 @@ void cBoardState::fAddKingMoves(int i, int j)
 
 void cBoardState::fAddMove(int i, int j, int i2, int j2, int list)
 {
-  //                                             piece         capture
   gameMove newMove;
   newMove.fromI = i;
   newMove.fromJ = j;
@@ -405,13 +408,11 @@ void cBoardState::fAddMove(int i, int j, int i2, int j2, int list)
     mValidList.push_back(newMove);
 }
 
-void cBoardState::fPrintMoves()
-{
-
-}
+void cBoardState::fPrintMoves(){}
 
 std::string cBoardState::fPrintPiece(int piece)
 {
+  //unicode
   switch(piece)
   {
     case W_KING:   return "\u2654";
@@ -456,7 +457,7 @@ void cBoardState::fProcessMove(gameMove *m)
   if(fMoveIsValid(m))
   {
     fMove(m); //move and update turn
-    fIsInCheck();
+    fIsInCheck(); //is the current player in check?
     fComputeValidMoves();
     fRemoveChecks();
   }
@@ -490,7 +491,7 @@ void cBoardState::fMove(gameMove *m)
     mEnPassant[0] = m->toI;
     mEnPassant[1] = m->toJ;
   }
-  else //en passant capture can only be performed the turn immediately after the pawn moves forward twice
+  else //en passant capture can only be performed the turn immediately after the pawn moves forward two spaces
   {
     mEnPassant[0] = -1;
     mEnPassant[1] = -1;
@@ -553,7 +554,7 @@ void cBoardState::fMove(gameMove *m)
     }
   }
 
-mTurn++;
+mTurn++; //next turn
 }
 
 void cBoardState::fIsInCheck()
@@ -768,7 +769,7 @@ bool cBoardState::fCheckMoves(gameMove *m)
   {
     if(m->fromJ == mValidList[i].fromJ && m->fromI == mValidList[i].fromI \
        && m->toJ == mValidList[i].toJ && m->toI == mValidList[i].toI )
-     //  && m->piece == curr->move.piece && m->capture == curr->move.capture)
+     //  && m->piece == curr->move.piece && m->capture == curr->move.capture) //dont really need this but its there if you want it
       {
        return true;
       }
@@ -790,7 +791,6 @@ void cBoardState::fAiCalculateMove()
     fMPIGetBoardState();
 
     int numMoves = mValidList.size();
-//    printf("Rank %d: after getboadrstate, moves = %d\n", rank, numMoves);
 
     bestScore[0] = -9999; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
 
@@ -799,7 +799,6 @@ void cBoardState::fAiCalculateMove()
     if(numMoves >= rank)
     {
       cBoardState simuBoard = *this;
-      //gameMove *m = new gameMove;
 
       if(mTurn%2 == 0)
         player = W_PAWN;
@@ -837,24 +836,14 @@ void cBoardState::fAiCalculateMove()
       }
 
       //simulate all the moves in the valid list to find the best one
-      //for(it = mValidList.begin(); it != mValidList.end(); it++)
 
       //check my math if you want :)
       int start = (((rank - 1) * testNum) + prevOffset);
       int stop  = ((rank * testNum) + offset);
 
-    //  std::cout << "Rank " << rank << ": total = " << numMoves << " , start = " << start << " , stop = " << stop << std::endl;
       for(i = start; i < stop; i++)
       {
-  //      printf("Rank %d: currently testing move index %d\n", rank, i);
         it = mValidList.begin() + i;
-        /*m->fromI = it->fromI;
-        m->fromJ = it->fromJ;
-        m->toI = it->toI;
-        m->toJ = it->toJ;
-        m->piece = it->piece;
-        m->capture = it->capture;
-*/
         score = simuBoard.fAlphaBeta(&(*it), player, true, -9999, 9999, 6);
 
         simuBoard.fUndoMove();
@@ -867,7 +856,6 @@ void cBoardState::fAiCalculateMove()
         }
       }
 
-//      printf("Rank %d: wait before allreduce\n", rank);
       //synchronize before mpi reduce
       MPI_Barrier(MPI_COMM_WORLD);
 
@@ -889,19 +877,19 @@ void cBoardState::fAiCalculateMove()
 
     else
     {
-      //two barriers to keep process that are not computing in sync with those that are
+      //barriers to keep process that are not computing in sync with those that are
       MPI_Barrier(MPI_COMM_WORLD);
 
+      //apparently MPI needs ALL processes to call this so thats why this is here, these will have -9999 as the score so its fine
       MPI_Allreduce(&bestScore, &globalBest, 1, MPI_2INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
       MPI_Barrier(MPI_COMM_WORLD);
     }
 
-  //  printf("Rank %d: next itr wait\n", rank);
     //wait for all processes to reach this point before going on to next iteration
     MPI_Barrier(MPI_COMM_WORLD);
 
-  }while(mState == PLAYING);
+  }while(mState == PLAYING); //idk if this actually ever exits
 
 }
 
@@ -910,21 +898,14 @@ int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int al
   int i, score;
   int bestVal = -9999; //the maximizing player tries to increase this
   std::vector<gameMove>::iterator it;
-  gameMove *mv = new gameMove;
 
   if(depthLeft == 0)
-  {
-    delete mv;
-    mv = 0;
-
-    return (maxPlayer * (mBScore - mWScore));
-  }
+    return ((maxPlayer*-1) * (mBScore - mWScore)); //idk if this is the right way to evaluate, seems to work though
 
   fMove(m);
   fIsInCheck();
   fComputeValidMoves();
   fRemoveChecks();
-
 
   cBoardState simuBoard = *this;
   int numMoves = mMoveList.size();
@@ -933,15 +914,7 @@ int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int al
   {
     for(it = mValidList.begin(); it != mValidList.end(); it++)
     {
-      mv->fromI = it->fromI;
-      mv->fromJ = it->fromJ;
-      mv->toI = it->toI;
-      mv->toJ = it->toJ;
-      mv->piece = it->piece;
-      mv->capture = it->capture;
-
-      score = simuBoard.fAlphaBeta(mv, maxPlayer, false, alpha, beta, depthLeft - 1);
-
+      score = simuBoard.fAlphaBeta(&(*it), maxPlayer, false, alpha, beta, depthLeft - 1);
 
       if(depthLeft > 1)
         simuBoard.fUndoMove();
@@ -953,15 +926,9 @@ int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int al
         alpha = bestVal;
 
       if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
-      {
-        delete mv;
-        mv = 0;
         return alpha;
-      }
     }
 
-    delete mv;
-    mv = 0;
     return alpha;
   }
 
@@ -969,14 +936,7 @@ int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int al
   {
     for(it = mValidList.begin(); it != mValidList.end(); it++)
     {
-      mv->fromI = it->fromI;
-      mv->fromJ = it->fromJ;
-      mv->toI = it->toI;
-      mv->toJ = it->toJ;
-      mv->piece = it->piece;
-      mv->capture = it->capture;
-
-      score = simuBoard.fAlphaBeta(mv, maxPlayer, true, alpha, beta, depthLeft - 1);
+      score = simuBoard.fAlphaBeta(&(*it), maxPlayer, true, alpha, beta, depthLeft - 1);
 
       if(depthLeft > 1)
         simuBoard.fUndoMove();
@@ -988,15 +948,9 @@ int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int al
         beta = bestVal;
 
       if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
-      {
-        delete mv;
-        mv = 0;
         return beta;
-      }
     }
 
-    delete mv;
-    mv = 0;
     return beta;
   }
 }
@@ -1032,14 +986,11 @@ void cBoardState::fMPISendBoardState()
   //synchronize processes so that they are ready to recv the boardstate
   MPI_Barrier(MPI_COMM_WORLD);
 
-//  printf("Rank %d: sending boadrstate\n", rank);
   //send boardstate
   MPI_Bcast(m, 1, customType, 0, MPI_COMM_WORLD);
 
   //wait until all processes get the boardstate
   MPI_Barrier(MPI_COMM_WORLD);
-
-//  printf("Rank %d: sent boadrstate to %d processes\n", rank, worldSize);
 
   delete m;
 }
@@ -1048,8 +999,6 @@ void cBoardState::fMPIGetBoardState()
 {
   int i, j;
   mpiBoardState* m = new mpiBoardState;
-
-//  printf("Rank %d: about to recv boadrstate\n", rank);
 
   //synchronize processes so that they are ready to recv the boardstate
   MPI_Barrier(MPI_COMM_WORLD);
@@ -1060,11 +1009,9 @@ void cBoardState::fMPIGetBoardState()
   //wait until all processes get the boardstate
   MPI_Barrier(MPI_COMM_WORLD);
 
-//  printf("Rank %d: received boadrstate\n", rank);
-
   cBoardState* bs = new cBoardState(m);
 
-  *this = *bs;
+  *this = *bs; //lmao
 
   fIsInCheck();
   fComputeValidMoves();
@@ -1082,7 +1029,6 @@ gameMove* cBoardState::fMPIGetBestMove()
 
   gameMove *m = new gameMove;
 
-//  printf("Rank %d: wait before allreduce\n", rank);
   //synchronize before mpi reduce
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -1091,14 +1037,12 @@ gameMove* cBoardState::fMPIGetBestMove()
 
   //wait for everyone to get the data
   MPI_Barrier(MPI_COMM_WORLD);
-//  printf("Rank %d: Recieved allreduce\n", rank);
-//  printf("Rank %d: waiting for index\n", rank);
+
   //get the index of of the best move from the corresponding process
   MPI_Recv(&index, 1, MPI_INT, globalBest[1], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
   //synchronize again before next iteration
   MPI_Barrier(MPI_COMM_WORLD);
-//  printf("Rank %d: received index\n", rank);
 
   it = mValidList.begin() + index;
 
@@ -1115,8 +1059,6 @@ gameMove* cBoardState::fMPIGetBestMove()
 int cBoardState::fGetState(){return mState;}
 
 int cBoardState::fGetTurn(){return mTurn;}
-
-void cBoardState::fSetType(MPI_Datatype d){mCustomType = d;}
 
 int cBoardState::fGetListCount(int list)
 {

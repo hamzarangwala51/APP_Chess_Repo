@@ -31,7 +31,7 @@ enum list {MOVELIST = 0, VALIDLIST};
 
 enum gameState {PLAYING = 0, DRAW, WHITEWON, BLACKWON};
 
-//same as cBoardState but to tranfer over MPI
+//same as cBoardState but to transfer over MPI
 typedef struct mpiBoardState
 {
   int mBoard[64];
@@ -62,15 +62,14 @@ class cBoardState
     int mBScore;       //total board score, see computeValidMoves()
     int mBoard[8][8];
     int mEnPassant[2]; //coordinates of piece that can be captured en passant
-    int mWLostCastle; //what turn did white lose castling ability?
+    int mWLostCastle;  //what turn did white lose castling ability?
     int mBLostCastle;
-    MPI_Datatype mCustomType;
 
     bool mWCheck;      //is white in check?
     bool mBCheck;
 
-    std::vector<gameMove> mMoveList;  //list of moves that have been played
-    std::vector<gameMove> mValidList; //list of legal moves that can be played this turn
+    std::vector<gameMove> mMoveList;     //list of moves that have been played
+    std::vector<gameMove> mValidList;    //list of legal moves that can be played this turn
 
     void fAddPieceMoves(int i, int j);   //add moves for the piece at the given coordinates
     void fAddPawnMoves(int i, int j);
@@ -83,15 +82,15 @@ class cBoardState
     std::string fPrintPiece(int piece);
     void fMove(gameMove *m);             //perform the given move on the board
     void fIsInCheck();                   //update values if current player's king is in check
-    void fRemoveChecks();				//remove moves that result in check
+    void fRemoveChecks();                //remove moves that result in check
     bool fCanMove(int i, int j);
     bool fMoveIsValid(gameMove *m);
     bool fCheckMoves(gameMove *m);       //check if the given move is in the validList
 
     mpiBoardState* fToStruct();
-    void fMPIGetBoardState();
+    void fMPIGetBoardState();            //for MPI compute threads to get board from root thread
 
-    //alpha beta pruning functions, used to find the "best" move the ai can make
+    //alpha beta pruning, used to find the "best" move the ai can make
     int fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft);
 
   public:
@@ -111,7 +110,6 @@ class cBoardState
 
     int fGetState();
     int fGetTurn();
-    void fSetType(MPI_Datatype d);
     int fGetListCount(int list);
 };
 
