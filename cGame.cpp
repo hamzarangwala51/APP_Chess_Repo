@@ -140,7 +140,7 @@ void cGame::fGameLoopPVA()
     if(bs->fGetTurn()%2 == 0)
     {
       double deltaT = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_nsec - t1.tv_nsec)/1000000000L;
-      std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetListCount(VALIDLIST) << " moves in " << deltaT << " seconds" << std::endl;
+      std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetCheckMoves() << " moves in " << deltaT << " seconds" << std::endl;
     }
   }
 
@@ -184,7 +184,7 @@ void cGame::fGameLoopAVA()
     else
       std::cout << "Black ";
 
-    std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetListCount(VALIDLIST) << " moves in " << deltaT << " seconds" << std::endl;
+    std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetCheckMoves() << " moves in " << deltaT << " seconds" << std::endl;
   }
 
   bs->fPrintBoard();

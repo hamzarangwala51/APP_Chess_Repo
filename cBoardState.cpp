@@ -7,6 +7,8 @@
 
 #include "cBoardState.h"
 
+bool moveCompare(gameMove m, gameMove m2) { return (m.score < m2.score); }
+
 //constructor
 cBoardState::cBoardState()
 {
@@ -32,7 +34,7 @@ cBoardState::cBoardState()
 
   mBCheck = false;
   mWCheck = false;
-
+  mEndGame = false;
 }
 
 //copy constructor
@@ -49,6 +51,9 @@ cBoardState::cBoardState(const cBoardState &b2)
   mWCheck = b2.mWCheck;
   mBLostCastle = b2.mBLostCastle;
   mWLostCastle = b2.mWLostCastle;
+  mEndGame = b2.mEndGame;
+//  mValidList = b2.mValidList;
+//  mMoveList = b2.mMoveList;
 }
 
 //construct from struct
@@ -67,9 +72,10 @@ cBoardState::cBoardState(mpiBoardState *m)
   mEnPassant[0] = m->mEnPassant[0];
   mEnPassant[1] = m->mEnPassant[1];
   mBCheck = m->mBCheck == 1? true : false;
-  mWCheck = m->mWCheck == 1? true : false;;
+  mWCheck = m->mWCheck == 1? true : false;
   mBLostCastle = m->mBLostCastle;
   mWLostCastle = m->mWLostCastle;
+  mEndGame = m->mEndGame == 1? true : false;
 }
 
 void cBoardState::fComputeValidMoves()
@@ -86,24 +92,32 @@ void cBoardState::fComputeValidMoves()
     for(j = 0; j < 8; j++)
     {
       piece = abs(mBoard[i][j]); //absolute value
-      switch(piece) //both players will start at 1000 points
+      switch(piece) //https://en.wikipedia.org/wiki/Chess_piece_relative_value
       {
-         case B_KING:    val = 500;
+         case B_KING:    val = 20000;
+                         val += mBoard[i][j] > 0?
+                                mEndGame? kingEndGame[63 - ((i << 3) + j)] : kingSquare[63 - ((i << 3) + j)]
+                                : mEndGame? kingEndGame[((i << 3) + j)] : kingSquare[((i << 3) + j)];
                          break;
 
-         case B_QUEEN:   val = 300;
+         case B_QUEEN:   val = 900;
+                         val += mBoard[i][j] > 0? queenSquare[63 - ((i << 3) + j)] : queenSquare[((i << 3) + j)];
                          break;
 
-         case B_ROOK:    val = 50;
+         case B_ROOK:    val = 500;
+                         val += mBoard[i][j] > 0? rookSquare[63 - ((i << 3) + j)] : rookSquare[((i << 3) + j)];
                          break;
 
-         case B_BISHOP:  val = 20;
+         case B_BISHOP:  val = 330;
+                         val += mBoard[i][j] > 0? bishopSquare[63 - ((i << 3) + j)] : bishopSquare[((i << 3) + j)];
                          break;
 
-         case B_KNIGHT:  val = 10;
+         case B_KNIGHT:  val = 320;
+                         val += mBoard[i][j] > 0? knightSquare[63 - ((i << 3) + j)] : knightSquare[((i << 3) + j)];
                          break;
 
-         case B_PAWN:    val = 5;
+         case B_PAWN:    val = 100;
+                         val += mBoard[i][j] > 0? pawnSquare[63 - ((i << 3) + j)] : pawnSquare[((i << 3) + j)];
                          break;
 
          case EMPTY: //fall through
@@ -121,6 +135,9 @@ void cBoardState::fComputeValidMoves()
         fAddPieceMoves(i, j);
     }
   }
+
+  if(mWScore <= 21200 || mBScore <= 21200)
+    mEndGame = true;
 }
 
 void cBoardState::fAddPieceMoves(int i, int j)
@@ -394,6 +411,7 @@ void cBoardState::fAddKingMoves(int i, int j)
 
 void cBoardState::fAddMove(int i, int j, int i2, int j2, int list)
 {
+  int oldB = mBScore, oldW = mWScore;
   gameMove newMove;
   newMove.fromI = i;
   newMove.fromJ = j;
@@ -402,13 +420,36 @@ void cBoardState::fAddMove(int i, int j, int i2, int j2, int list)
   newMove.piece = mBoard[i][j];
   newMove.capture = mBoard[i2][j2];
 
+  mWScore = oldW;
+  mBScore = oldB;
+
   if(list == MOVELIST)
     mMoveList.push_back(newMove);
   else
     mValidList.push_back(newMove);
 }
 
-void cBoardState::fPrintMoves(){}
+void cBoardState::fPrintMoves(int list)
+{
+  std::vector<gameMove>::iterator it, stop;
+
+  if(list == MOVELIST)
+  {
+    it = mMoveList.begin();
+    stop = mMoveList.end();
+  }
+  else
+  {
+    it = mValidList.begin();
+    stop = mValidList.end();
+  }
+
+  std::cout << "Rank " << rank << " Moves:" << std::endl;
+  for(it; it != stop; it++)
+  {
+    std::cout << char(it->fromJ + 'a') << char('8' - it->fromI) << char(it->toJ + 'a') << char('8' - it->toI) << std::endl; 
+  }
+}
 
 std::string cBoardState::fPrintPiece(int piece)
 {
@@ -554,7 +595,7 @@ void cBoardState::fMove(gameMove *m)
     }
   }
 
-mTurn++; //next turn
+  mTurn++; //next turn
 }
 
 void cBoardState::fIsInCheck()
@@ -656,6 +697,7 @@ void cBoardState::fRemoveChecks()
 void cBoardState::fUndoMove()
 {
   mTurn--;
+  mState = PLAYING;
 
   //check if move was an en passant capture, if so J values will not be the same and the capture will be empty
   if(abs(mMoveList.back().piece) == B_PAWN && mMoveList.back().fromJ != mMoveList.back().toJ && mMoveList.back().capture == EMPTY)
@@ -708,7 +750,6 @@ void cBoardState::fUndoMove()
   //undo move
   mBoard[mMoveList.back().fromI][mMoveList.back().fromJ] = mMoveList.back().piece;
   mBoard[mMoveList.back().toI][mMoveList.back().toJ] = mMoveList.back().capture;
-
 
   mMoveList.pop_back(); //remove move from movelist
 }
@@ -792,7 +833,9 @@ void cBoardState::fAiCalculateMove()
 
     int numMoves = mValidList.size();
 
-    bestScore[0] = -9999; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
+    mNumCheckMoves = 0;
+
+    bestScore[0] = -30000; //Ai wants to maximize this score. Score is (ai's score - opponent's score)
 
     //only allows enough processes as needed, ie if theres 60 moves and 300 procs then only 60 will compute
     //rank 0 will never get here
@@ -844,7 +887,7 @@ void cBoardState::fAiCalculateMove()
       for(i = start; i < stop; i++)
       {
         it = mValidList.begin() + i;
-        score = simuBoard.fAlphaBeta(&(*it), player, true, -9999, 9999, 6);
+        score = simuBoard.fAlphaBeta(&(*it), player, -30000, 30000, 5, mNumCheckMoves);
 
         simuBoard.fUndoMove();
 
@@ -865,6 +908,13 @@ void cBoardState::fAiCalculateMove()
       //wait for everyone to get the data
       MPI_Barrier(MPI_COMM_WORLD);
 
+      //sum all moves checked by the ai processes
+      MPI_Reduce(&mNumCheckMoves, NULL, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+      //wait for rank 0 to get the data
+      MPI_Barrier(MPI_COMM_WORLD);
+
+
 
       //if this process had the highest score send the index of the move
       if(globalBest[1] == rank)
@@ -884,6 +934,13 @@ void cBoardState::fAiCalculateMove()
       MPI_Allreduce(&bestScore, &globalBest, 1, MPI_2INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
       MPI_Barrier(MPI_COMM_WORLD);
+
+      //sum all moves checked by the ai processes
+      MPI_Reduce(&mNumCheckMoves, NULL, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+      //wait for rank 0 to get the data
+      MPI_Barrier(MPI_COMM_WORLD);
+
     }
 
     //wait for all processes to reach this point before going on to next iteration
@@ -893,66 +950,60 @@ void cBoardState::fAiCalculateMove()
 
 }
 
-int cBoardState::fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft)
+//using negaMax, https://en.wikipedia.org/wiki/Negamax
+int cBoardState::fAlphaBeta(gameMove* m, int player, int alpha, int beta, int depthLeft, int& numMoves)
 {
-  int i, score;
-  int bestVal = -9999; //the maximizing player tries to increase this
+  int i, bestVal, score;
   std::vector<gameMove>::iterator it;
 
-  if(depthLeft == 0)
-    return ((maxPlayer*-1) * (mBScore - mWScore)); //idk if this is the right way to evaluate, seems to work though
+  if(depthLeft == 0 || mState > 0)
+  {
+    return (player * (mBScore - mWScore));
+  }
 
   fMove(m);
-  fIsInCheck();
   fComputeValidMoves();
+  fIsInCheck();
   fRemoveChecks();
 
+  numMoves++; //number of moves checked in total
+
   cBoardState simuBoard = *this;
-  int numMoves = mMoveList.size();
 
-  if(isMaxPlayer)
+  bestVal = -30000; //player tries to increase this
+
+  for(it = mValidList.begin(); it != mValidList.end(); it++)
   {
-    for(it = mValidList.begin(); it != mValidList.end(); it++)
-    {
-      score = simuBoard.fAlphaBeta(&(*it), maxPlayer, false, alpha, beta, depthLeft - 1);
-
-      if(depthLeft > 1)
-        simuBoard.fUndoMove();
-
-      if(score > bestVal) //is this score better than the current best?
-        bestVal = score;
-
-      if(bestVal > alpha) //is the current best score better than the alpha?
-        alpha = bestVal;
-
-      if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
-        return alpha;
-    }
-
-    return alpha;
+    simuBoard.fMove(&(*it));
+    it->score = (player * (mBScore - mWScore));
+    simuBoard.fUndoMove();
   }
 
-  else
+  std::sort(mValidList.begin(), mValidList.end(), moveCompare); //sort on a depth level 1 basis.
+
+  //start search
+  for(it = mValidList.begin(); it != mValidList.end(); it++)
   {
-    for(it = mValidList.begin(); it != mValidList.end(); it++)
+
+    score = simuBoard.fAlphaBeta(&(*it), -player, -beta, -alpha, depthLeft - 1, numMoves);
+
+
+    if(depthLeft > 1)
     {
-      score = simuBoard.fAlphaBeta(&(*it), maxPlayer, true, alpha, beta, depthLeft - 1);
-
-      if(depthLeft > 1)
-        simuBoard.fUndoMove();
-
-      if(score < bestVal) //is this score better than the current best?
-        bestVal = score;
-
-      if(bestVal < beta) //is the current best score better than the alpha?
-        beta = bestVal;
-
-      if(beta <= alpha)  //is the minimizing player's score better? if so stop looking
-        return beta;
+      simuBoard.fUndoMove();
     }
 
-    return beta;
+    if(score > bestVal) //is this score better than the current best?
+      bestVal = score;
+
+    if(bestVal > alpha) //is the current best score better than the alpha?
+      alpha = bestVal;
+
+    if(alpha >= beta)  //is the minimizing player's score better? if so stop looking
+      break;
   }
+
+  return alpha;
 }
 
 mpiBoardState* cBoardState::fToStruct()
@@ -975,6 +1026,7 @@ mpiBoardState* cBoardState::fToStruct()
   m->mBLostCastle = mBLostCastle;
   m->mWCheck = mWCheck? 1 : 0;
   m->mBCheck = mBCheck? 1 : 0;
+  m->mEndGame = mEndGame? 1 : 0;
 
   return m;
 }
@@ -1013,8 +1065,8 @@ void cBoardState::fMPIGetBoardState()
 
   *this = *bs; //lmao
 
-  fIsInCheck();
   fComputeValidMoves();
+  fIsInCheck();
   fRemoveChecks();
 
   delete m;
@@ -1024,7 +1076,7 @@ void cBoardState::fMPIGetBoardState()
 gameMove* cBoardState::fMPIGetBestMove()
 {
   int bestScore[2] = {-99999, 0}; //make sure this is never the max score
-  int index, globalBest[2];
+  int index, globalBest[2], dummy = 0;
   std::vector<gameMove>::iterator it;
 
   gameMove *m = new gameMove;
@@ -1036,6 +1088,12 @@ gameMove* cBoardState::fMPIGetBestMove()
   MPI_Allreduce(&bestScore, &globalBest, 1, MPI_2INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
   //wait for everyone to get the data
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  //sum all moves checked by the ai processes
+  MPI_Reduce(&dummy, &mNumCheckMoves, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  //wait for rank 0 to get the data
   MPI_Barrier(MPI_COMM_WORLD);
 
   //get the index of of the best move from the corresponding process
@@ -1060,6 +1118,8 @@ int cBoardState::fGetState(){return mState;}
 
 int cBoardState::fGetTurn(){return mTurn;}
 
+int cBoardState::fGetCheckMoves(){return mNumCheckMoves;}
+
 int cBoardState::fGetListCount(int list)
 {
   if(list == VALIDLIST)
@@ -1067,3 +1127,53 @@ int cBoardState::fGetListCount(int list)
   else
     return mMoveList.size();
 }
+
+/*int cBoardState::fEval()
+{
+  int val;
+  for(i = 0; i < 8; i++)
+  {
+    for(j = 0; j < 8; j++)
+    {
+      piece = abs(mBoard[i][j]); //absolute value
+      switch(piece) //https://en.wikipedia.org/wiki/Chess_piece_relative_value
+      {
+       	 case B_KING:    val = 20000;
+                         val += mBoard[i][j] > 0?
+                                mEndGame? kingEndGame[63 - ((i << 3) + j)] : kingSquare[63 - ((i << 3) + j)]
+                                : mEndGame? kingEndGame[((i << 3) + j)] : kingSquare[((i << 3) + j)];
+                         break;
+
+         case B_QUEEN:   val = 900;
+                         val += mBoard[i][j] > 0? queenSquare[63 - ((i << 3) + j)] : queenSquare[((i << 3) + j)];
+                         break;
+
+         case B_ROOK:    val = 500;
+                         val += mBoard[i][j] > 0? rookSquare[63 - ((i << 3) + j)] : rookSquare[((i << 3) + j)];
+                         break;
+
+         case B_BISHOP:  val = 330;
+                         val += mBoard[i][j] > 0? bishopSquare[63 - ((i << 3) + j)] : bishopSquare[((i << 3) + j)];
+                         break;
+
+         case B_KNIGHT:  val = 320;
+                         val += mBoard[i][j] > 0? knightSquare[63 - ((i << 3) + j)] : knightSquare[((i << 3) + j)];
+                         break;
+
+         case B_PAWN:    val = 100;
+                         val += mBoard[i][j] > 0? pawnSquare[63 - ((i << 3) + j)] : pawnSquare[((i << 3) + j)];
+                         break;
+
+         case EMPTY: //fall through
+
+         default:        val = 0;
+      }
+
+      if(mBoard[i][j] > 0) //black piece
+         mBScore += val;
+      else //white piece
+         mWScore += val;
+    }
+  }
+}
+*/

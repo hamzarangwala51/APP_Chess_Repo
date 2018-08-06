@@ -5,19 +5,23 @@
  *      Author: mduarte
  */
 
+
+#ifndef BOARDSTATE_H_
+#define BOARDSTATE_H_
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <algorithm>
 #include "mpi.h"
-
-#ifndef BOARDSTATE_H_
-#define BOARDSTATE_H_
 
 extern int rank, worldSize;
 extern MPI_Datatype customType;
+extern int pawnSquare[64], knightSquare[64], bishopSquare[64];
+extern int rookSquare[64], queenSquare[64], kingSquare[64], kingEndGame[64];
 
 //Player v Player, Player v AI, AI v AI
 enum gameMode {PVP = 0, PVA, AVA};
@@ -44,6 +48,7 @@ typedef struct mpiBoardState
   int mBLostCastle;
   int mWCheck;
   int mBCheck;
+  int mEndGame;
 } mpiBoardState;
 
 typedef struct gameMove
@@ -51,19 +56,22 @@ typedef struct gameMove
   int fromI, fromJ; //start and end squares
   int toI, toJ;
   int piece, capture; //piece that moved and piece that was captured
+  int score;
 }gameMove;
 
 class cBoardState
 {
   private:
-    int mTurn;         //turn counter
-    int mState;        //gameState value from above
+    int mTurn;          //turn counter
+    int mState;         //gameState value from above
     int mWScore;
-    int mBScore;       //total board score, see computeValidMoves()
+    int mBScore;        //total board score, see computeValidMoves()
     int mBoard[8][8];
-    int mEnPassant[2]; //coordinates of piece that can be captured en passant
-    int mWLostCastle;  //what turn did white lose castling ability?
+    int mEnPassant[2];  //coordinates of piece that can be captured en passant
+    int mWLostCastle;   //what turn did white lose castling ability?
     int mBLostCastle;
+    int mEndGame;
+    int mNumCheckMoves; //number of moves the ai checked, for fun
 
     bool mWCheck;      //is white in check?
     bool mBCheck;
@@ -78,7 +86,7 @@ class cBoardState
     void fAddDiagMoves(int i, int j);    //add diagonal moves
     void fAddKingMoves(int i, int j);
     void fAddMove(int i, int j, int i2, int j2, int list); //add move to the given list
-    void fPrintMoves();
+    void fPrintMoves(int list);
     std::string fPrintPiece(int piece);
     void fMove(gameMove *m);             //perform the given move on the board
     void fIsInCheck();                   //update values if current player's king is in check
@@ -91,7 +99,7 @@ class cBoardState
     void fMPIGetBoardState();            //for MPI compute threads to get board from root thread
 
     //alpha beta pruning, used to find the "best" move the ai can make
-    int fAlphaBeta(gameMove* m, int maxPlayer, bool isMaxPlayer, int alpha, int beta, int depthLeft);
+    int fAlphaBeta(gameMove* m, int maxPlayer, int alpha, int beta, int depthLeft, int& checkMoves);
 
   public:
     cBoardState();
@@ -110,7 +118,9 @@ class cBoardState
 
     int fGetState();
     int fGetTurn();
+    int fGetCheckMoves();
     int fGetListCount(int list);
 };
 
 #endif /* BOARDSTATE_H_ */
+

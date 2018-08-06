@@ -8,6 +8,10 @@ pva:
 	mpirun -x TERM -hostfile hostfile chessMPI pva
 
 ava:
-	mpirun  -x TERM -hostfile hostfile chessMPI ava
+	mpirun -x TERM -hostfile hostfile chessMPI ava
+
+valgrind:
+	mpirun -x TERM -hostfile hostfile valgrind ./chessMPI ava
+
  
 	

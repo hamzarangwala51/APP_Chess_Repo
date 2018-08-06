@@ -2,6 +2,7 @@
 #include <string.h>
 #include <cstddef>
 #include "cGame.h"
+#include "pieceSquareTables.h"
 
 int worldSize, rank;
 MPI_Datatype customType;
@@ -13,7 +14,7 @@ int main(int argc, char **argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   //creating a custom MPI type for the mpiBoardState struct defined in cBoardState.h
-  int blockLength = 74;
+  int blockLength = 75;
   MPI_Aint displacement = 0;
   MPI_Datatype type = MPI_INT;
 
