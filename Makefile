@@ -1,4 +1,4 @@
-chessMPI: cGame.cpp cBoardState.cpp chessMPI.cpp
+chessMPI: cGame.cpp cBoardState.cpp chessMPI.cpp cHash.cpp
 	mpic++ -g -o chessMPI *.cpp 
 
 pvp:
@@ -10,8 +10,14 @@ pva:
 ava:
 	mpirun -x TERM -hostfile hostfile chessMPI ava
 
+ava2: 
+	mpirun -np 2 -x TERM -hostfile hostfile chessMPI ava
+
 valgrind:
 	mpirun -x TERM -hostfile hostfile valgrind ./chessMPI ava
+
+valgrind2:
+	mpirun -np 2 -x TERM -hostfile hostfile valgrind ./chessMPI ava
 
  
 	
