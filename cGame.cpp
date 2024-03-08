@@ -74,9 +74,9 @@ void cGame::fGameLoopPVP()
      bs->fPrintBoard();
 
     if(bs->fGetTurn()%2 == 0)
-      std::cout << "White: ";
-    else
       std::cout << "Black: ";
+    else
+      std::cout << "White: ";
 
     if(fGetCmd(&m))
     {
@@ -90,9 +90,9 @@ void cGame::fGameLoopPVP()
   {
     case DRAW:  std::cout << "Draw!" << std::endl; break;
 
-    case WHITEWON: std::cout << "White Won!" << std::endl; break;
+    case WHITEWON: std::cout << "Black Won!" << std::endl; break;
 
-    case BLACKWON: std::cout << "Black Won!" << std::endl; break;
+    case BLACKWON: std::cout << "White Won!" << std::endl; break;
   }
 }
 
@@ -107,7 +107,7 @@ void cGame::fGameLoopPVA()
 
     if(bs->fGetTurn()%2 == 0)
     {
-      std::cout << "White: ";
+      std::cout << "Black: ";
 
       m = new gameMove;
       int check = fGetCmd(m);
@@ -149,9 +149,9 @@ void cGame::fGameLoopPVA()
   {
     case DRAW:  std::cout << "Draw!" << std::endl; break;
 
-    case WHITEWON: std::cout << "White Won!" << std::endl; break;
+    case WHITEWON: std::cout << "Black Won!" << std::endl; break;
 
-    case BLACKWON: std::cout << "Black Won!" << std::endl; break;
+    case BLACKWON: std::cout << "White Won!" << std::endl; break;
   }
 
   delete m;
@@ -180,9 +180,9 @@ void cGame::fGameLoopAVA()
     double deltaT = (t2.tv_sec - t1.tv_sec) + (double)(t2.tv_nsec - t1.tv_nsec)/1000000000L;
 
     if(bs->fGetTurn()%2 == 1)
-      std::cout << "White ";
-    else
       std::cout << "Black ";
+    else
+      std::cout << "White ";
 
     std::cout << std::setprecision(3) << std::fixed << "Checked " << bs->fGetCheckMoves() << " moves in " << deltaT << " seconds" << std::endl;
   }
@@ -192,9 +192,9 @@ void cGame::fGameLoopAVA()
   {
     case DRAW:  std::cout << "Draw!" << std::endl; break;
 
-    case WHITEWON: std::cout << "White Won!" << std::endl; break;
+    case WHITEWON: std::cout << "Black Won!" << std::endl; break;
 
-    case BLACKWON: std::cout << "Black Won!" << std::endl; break;
+    case BLACKWON: std::cout << "White Won!" << std::endl; break;
   }
 
   delete m;
